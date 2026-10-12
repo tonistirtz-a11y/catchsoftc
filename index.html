@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Soft-c Space Hunt</title>
+<link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --yellow:#ffd23f; --green:#6bdc5b; --ink:#16123a; --cyan:#35e0ff; --pink:#ff5fa8; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:'Comic Neue','Comic Sans MS',cursive,sans-serif;color:#fff;background:#0b0830}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;max-width:1000px;margin:0 auto;
+    background:radial-gradient(ellipse at 20% 10%,#3a1f8f 0,#150f4a 55%,#0b0830 100%)}
+  #hud{display:none;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;font-weight:700;font-size:clamp(15px,3.4vw,22px);z-index:5}
+  .pill{background:rgba(255,255,255,.14);border-radius:999px;padding:4px 14px;white-space:nowrap}
+  .iconbtn{background:rgba(255,255,255,.18);border:none;color:#fff;font-size:21px;border-radius:50%;width:44px;height:44px;cursor:pointer}
+  #goal{display:none;text-align:center;font-weight:700;font-size:clamp(16px,3.6vw,24px);padding:0 12px 6px;color:var(--cyan)}
+  #goal b{color:var(--yellow)}
+  #field{position:relative;flex:1;overflow:hidden}
+  .stars{position:absolute;inset:0;background-image:
+    radial-gradient(2px 2px at 12% 20%,#fff9 50%,transparent 51%),radial-gradient(2px 2px at 35% 70%,#fff8 50%,transparent 51%),
+    radial-gradient(3px 3px at 60% 30%,#fff 50%,transparent 51%),radial-gradient(2px 2px at 80% 80%,#fff8 50%,transparent 51%),
+    radial-gradient(2px 2px at 92% 15%,#fff9 50%,transparent 51%),radial-gradient(2px 2px at 48% 90%,#fff7 50%,transparent 51%);
+    background-size:420px 300px;animation:drift 40s linear infinite;opacity:.8}
+  @keyframes drift{to{background-position:-420px 0}}
+  .rock{position:absolute;padding:12px 26px 14px;border-radius:46% 54% 50% 50%/55% 45% 55% 45%;font-weight:700;
+    font-size:clamp(26px,6.4vw,46px);cursor:pointer;touch-action:manipulation;white-space:nowrap;
+    background:radial-gradient(circle at 30% 25%,#b9a98f 0,#7f705c 45%,#57493a 100%);color:#fff;text-shadow:2px 2px 0 rgba(0,0,0,.45);
+    box-shadow:inset -8px -10px 0 rgba(0,0,0,.2),0 6px 14px rgba(0,0,0,.4);will-change:left}
+  .rock u{text-decoration:none;color:var(--yellow)}
+  .rock.good{background:radial-gradient(circle at 30% 25%,#fff7b8 0,#ffd23f 50%,#f0a500 100%);color:var(--ink);text-shadow:none;animation:collect .8s forwards;pointer-events:none}
+  .rock.good u{color:#d6246e}
+  .rock.bad{background:radial-gradient(circle at 30% 25%,#ff9a9a 0,#e04545 60%,#a31a1a 100%);animation:bad .7s forwards;pointer-events:none}
+  @keyframes collect{0%{transform:scale(1)}30%{transform:scale(1.35) rotate(-6deg)}100%{transform:translateY(-70px) scale(1.1);opacity:0}}
+  @keyframes bad{0%,100%{transform:none}15%{transform:translateX(-12px)}30%{transform:translateX(12px)}45%{transform:translateX(-8px)}60%{transform:translateX(8px)}100%{opacity:0;transform:scale(.7)}}
+  #toast{position:absolute;left:0;right:0;bottom:16px;text-align:center;padding:0 12px;pointer-events:none;opacity:0;transform:translateY(16px);transition:all .25s;z-index:6}
+  #toast.on{opacity:1;transform:none}
+  #toast span{display:inline-block;background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.3);border-radius:18px;padding:9px 18px;font-weight:700;font-size:clamp(15px,3.4vw,22px);max-width:640px}
+  #toast b{color:var(--yellow)}
+  #combo{position:absolute;left:14px;top:6px;font-weight:700;font-size:clamp(20px,5vw,32px);color:var(--yellow);text-shadow:2px 2px 0 rgba(0,0,0,.4);z-index:4}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;gap:12px;overflow:auto;z-index:20;background:rgba(11,8,48,.88)}
+  .screen.on{display:flex}
+  .screen h1{margin:0;font-size:clamp(36px,9.5vw,66px);color:var(--yellow);text-shadow:4px 4px 0 rgba(0,0,0,.4);line-height:1.05}
+  .screen h2{margin:0;font-size:clamp(26px,6.5vw,44px);color:var(--yellow)}
+  .screen p{margin:0;font-size:clamp(17px,3.6vw,24px);max-width:580px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  .label{font-weight:700;opacity:.85;font-size:clamp(15px,3vw,20px)}
+  .opt{border:3px solid rgba(255,255,255,.55);background:rgba(255,255,255,.1);color:#fff;font-family:inherit;font-weight:700;font-size:clamp(16px,3.6vw,22px);border-radius:16px;padding:10px 18px;cursor:pointer}
+  .opt.sel{background:var(--yellow);color:var(--ink);border-color:var(--yellow)}
+  .big{border:none;background:var(--green);color:var(--ink);font-family:inherit;font-weight:700;font-size:clamp(24px,6vw,38px);border-radius:24px;padding:12px 44px;cursor:pointer;box-shadow:0 7px 0 #3f9c33;margin-top:6px}
+  .big:active{transform:translateY(4px);box-shadow:0 3px 0 #3f9c33}
+  .big[disabled]{opacity:.35;pointer-events:none}
+  .letters{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .let{width:clamp(58px,15vw,88px);height:clamp(58px,15vw,88px);border-radius:20px;border:3px solid rgba(255,255,255,.6);background:rgba(255,255,255,.12);color:#fff;
+    font-family:inherit;font-weight:700;font-size:clamp(32px,8vw,52px);cursor:pointer}
+  .let.on{background:var(--yellow);color:var(--ink);border-color:var(--yellow);transform:scale(1.1)}
+  .let.no{animation:wig .45s;background:#e04545}
+  @keyframes wig{0%,100%{transform:none}25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-5px)}}
+  #found{font-size:clamp(26px,7vw,46px);font-weight:700;color:var(--cyan);min-height:1.3em;letter-spacing:4px}
+  .rulebox{background:rgba(255,255,255,.1);border-radius:16px;padding:10px 16px;max-width:620px;text-align:left;font-size:clamp(15px,3.2vw,20px)}
+  .rulebox b{color:var(--yellow)}
+  #breakScreen{background:linear-gradient(180deg,#0fa38f,#157a9c)}
+  #breakText{font-size:clamp(28px,7.5vw,52px);font-weight:700}
+  #breakTimer{font-size:clamp(50px,14vw,100px);font-weight:700;color:var(--yellow)}
+  .particle{position:absolute;pointer-events:none;font-size:26px;z-index:8;animation:fly 1s ease-out forwards}
+  @keyframes fly{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <span class="pill" id="score">⭐ 0</span>
+    <span class="pill" id="prog">🎯 0 / 5</span>
+    <span class="pill" id="hearts">❤️❤️❤️</span>
+    <button class="iconbtn" id="muteBtn" aria-label="Sound on or off">🔊</button>
+  </div>
+  <div id="goal">Tap the words where <b>c says /s/</b>. Let the others float by!</div>
+
+  <div id="field">
+    <div class="stars"></div>
+    <div id="combo"></div>
+    <div id="toast"><span id="toastText"></span></div>
+
+    <!-- Start -->
+    <div class="screen on" id="startScreen">
+      <h1>Soft-c<br>Space Hunt 🚀</h1>
+      <p>Word asteroids are zooming by! Catch the ones where <b>c says /s/</b>.</p>
+      <div class="label">Choose a word set</div>
+      <div class="row" id="setRow">
+        <button class="opt sel" data-set="A">📝 Worksheet words</button>
+        <button class="opt" data-set="B">➕ More words</button>
+        <button class="opt" data-set="M">🔀 Mixed</button>
+      </div>
+      <div class="label">Choose your speed</div>
+      <div class="row" id="speedRow">
+        <button class="opt" data-s="chill">🐢 Chill</button>
+        <button class="opt sel" data-s="normal">🚀 Normal</button>
+        <button class="opt" data-s="zoom">⚡ Zoom</button>
+      </div>
+      <div class="label">Hear each word after you tap it?</div>
+      <div class="row" id="hearRow">
+        <button class="opt sel" data-h="off">🤫 No — I read it</button>
+        <button class="opt" data-h="on">🔈 Yes</button>
+      </div>
+      <button class="big" id="playBtn">NEXT</button>
+    </div>
+
+    <!-- Rule unlock -->
+    <div class="screen" id="ruleScreen">
+      <h2>🔓 Unlock the rule!</h2>
+      <p>Which letters make <b>c</b> say /s/? Tap them.</p>
+      <div class="letters" id="letters"></div>
+      <div id="found"></div>
+      <div class="rulebox" id="ruleNote" style="display:none"></div>
+      <button class="big" id="huntBtn" disabled>START HUNT!</button>
+      <button class="opt" id="skipRule">Skip</button>
+    </div>
+
+    <!-- Break -->
+    <div class="screen" id="breakScreen">
+      <h2>🧠 Brain Break!</h2>
+      <div id="breakText"></div>
+      <div id="breakTimer">10</div>
+      <button class="opt" id="skipBreak">Skip break</button>
+    </div>
+
+    <!-- Done -->
+    <div class="screen" id="doneScreen">
+      <h2 id="doneTitle">Mission complete!</h2>
+      <p id="doneStats"></p>
+      <div class="rulebox" id="doneNotes"></div>
+      <button class="big" id="againBtn">Hunt again</button>
+      <button class="opt" id="menuBtn">Change word set</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Words ---------- */
+const S = w => ({ w, soft: true }), H = w => ({ w, soft: false });
+const SET_A = [S('race'), H('cot'), S('city'), H('cup'), S('ice'), H('cab'), S('fancy'), H('clap'), S('cent'), H('corn')];
+const SET_B = [S('cell'), S('face'), S('mice'), S('pencil'), S('dance'), H('cat'), H('cut'), H('crab'), H('clip'), H('cube')];
+const EXTRA_S = ['rice','lace','space','price','fence','juice','mercy','spicy','bounce','place'].map(S);
+const EXTRA_H = ['cap','camp','cold','cub','cry','cost','cute','club','crisp','can'].map(H);
+const ALL_S = SET_A.concat(SET_B).concat(EXTRA_S).filter(x => x.soft);
+const ALL_H = SET_A.concat(SET_B).concat(EXTRA_H).filter(x => !x.soft);
+
+// v = pixels per second, gap = ms between words, max = most words on screen at once
+const SPEEDS = { chill: { v: 34, gap: 2600, max: 2 }, normal: { v: 52, gap: 1900, max: 3 }, zoom: { v: 80, gap: 1400, max: 4 } };
+let hearWords = false;   // off by default so the student has to read each word themselves
+const BREAKS = ['Do 10 jumping jacks! 🤸','Reach up like a rocket! 🚀','Touch your toes 5 times! 🙆','March in place for 10 steps! 🚶',
+  'Take 3 big, slow breaths. 🌬️','Do 5 squats! 🏋️','Shake your hands out! 👐','Spin around once! 🌀'];
+
+/* ---------- State ---------- */
+let setKey = 'A', speedKey = 'normal', queue = [], spawnIdx = 0, rocks = [], resolved = 0;
+let score = 0, hearts = 3, combo = 0, bestCombo = 0, foundSoft = 0, softTotal = 0, wrong = [], escaped = [];
+let running = false, lastT = 0, sinceSpawn = 0, breakPending = false, breakDone = false, muted = false, breakInt = null;
+const $ = id => document.getElementById(id), field = $('field');
+
+/* ---------- Audio ---------- */
+let AC = null;
+function ac(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function tone(f,d,t='sine',v=.13,dl=0){ if(muted) return; const a=ac(); if(!a) return;
+  const o=a.createOscillator(), g=a.createGain(); o.type=t; o.frequency.value=f; const s=a.currentTime+dl;
+  g.gain.setValueAtTime(v,s); g.gain.exponentialRampToValueAtTime(.001,s+d); o.connect(g); g.connect(a.destination); o.start(s); o.stop(s+d); }
+const sfx = {
+  good(){ tone(784,.1,'square',.1); tone(1175,.16,'triangle',.12,.07); },
+  bad(){ tone(180,.3,'sawtooth',.13); },
+  win(){ [523,659,784,1046].forEach((f,i)=>tone(f,.2,'triangle',.14,i*.12)); },
+  tick(){ tone(880,.05,'square',.05); }
+};
+function speak(t){ if(muted||!('speechSynthesis' in window)) return;
+  try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.rate=.85; u.lang='en-US'; speechSynthesis.speak(u); }catch(e){} }
+
+/* ---------- Helpers ---------- */
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function cInfo(word){ const i = word.indexOf('c'); const n = word[i+1] || ''; return { i, n }; }
+function markHTML(word){ const {i,n} = cInfo(word); if(i<0) return word;
+  return word.slice(0,i) + '<u>' + 'c' + n + '</u>' + word.slice(i+2); }
+function reason(it){
+  const {n} = cInfo(it.w), pair = 'c' + n;
+  if(it.soft) return '<b>' + it.w + '</b> — <b>' + pair + '</b>: c says /s/ before <b>' + n + '</b>. Soft c!';
+  const vow = 'aou'.includes(n);
+  return '<b>' + it.w + '</b> — c says /k/ ' + (vow ? 'before <b>' + n + '</b>' : 'before the consonant <b>' + n + '</b>') + '. Only <b>e, i, y</b> make c soft.';
+}
+function toast(h, ms=3200){ $('toastText').innerHTML = h; $('toast').classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>$('toast').classList.remove('on'), ms); }
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); if(id) $(id).classList.add('on'); }
+function burst(x,y,emoji){ const em = emoji || ['✨','⭐','💫','🌟'];
+  for(let i=0;i<12;i++){ const p=document.createElement('div'); p.className='particle'; p.textContent=em[i%em.length];
+    p.style.left=x+'px'; p.style.top=y+'px'; p.style.setProperty('--dx',(Math.random()*320-160)+'px');
+    p.style.setProperty('--dy',(Math.random()*280-180)+'px'); p.style.setProperty('--r',(Math.random()*540-270)+'deg');
+    field.appendChild(p); setTimeout(()=>p.remove(),1000); } }
+function updHUD(){
+  $('score').textContent = '⭐ ' + score;
+  $('prog').textContent = '🎯 ' + foundSoft + ' / ' + softTotal;
+  $('hearts').textContent = '❤️'.repeat(hearts) + '🖤'.repeat(3-hearts);
+  $('combo').textContent = combo >= 2 ? '🔥 x' + combo : '';
+}
+
+/* ---------- Menu wiring ---------- */
+function pick(row, attr, cb){ $(row).addEventListener('click', e=>{ const b=e.target.closest('.opt'); if(!b) return;
+  [...$(row).children].forEach(c=>c.classList.remove('sel')); b.classList.add('sel'); cb(b.dataset[attr]); }); }
+pick('setRow','set',v=>setKey=v); pick('speedRow','s',v=>speedKey=v); pick('hearRow','h',v=>hearWords=(v==='on'));
+$('muteBtn').onclick = ()=>{ muted=!muted; $('muteBtn').textContent = muted?'🔇':'🔊'; if(muted) try{speechSynthesis.cancel();}catch(e){} };
+$('playBtn').onclick = ()=>{ ac(); if(AC && AC.state==='suspended') AC.resume(); buildRule(); show('ruleScreen'); };
+$('skipRule').onclick = startHunt; $('huntBtn').onclick = startHunt; $('againBtn').onclick = startHunt;
+$('menuBtn').onclick = ()=>{ $('hud').style.display='none'; $('goal').style.display='none'; show('startScreen'); };
+$('skipBreak').onclick = endBreak;
+
+/* ---------- Rule unlock ---------- */
+let unlocked = new Set();
+function buildRule(){
+  unlocked = new Set(); $('found').textContent=''; $('ruleNote').style.display='none'; $('huntBtn').disabled = true;
+  const box = $('letters'); box.innerHTML='';
+  shuffle(['a','e','i','o','u','y']).forEach(l=>{
+    const b=document.createElement('button'); b.className='let'; b.textContent=l;
+    b.onclick = ()=>{
+      if('eiy'.includes(l)){
+        if(unlocked.has(l)) return; unlocked.add(l); b.classList.add('on'); sfx.good(); speak('c ' + l);
+        $('found').textContent = ['e','i','y'].filter(x=>unlocked.has(x)).map(x=>'c'+x).join('  ');
+        if(unlocked.size===3){
+          $('ruleNote').innerHTML = '🎉 <b>ce · ci · cy</b> — c says /s/ before <b>e, i, y</b>. Before any other letter, c says /k/.';
+          $('ruleNote').style.display='block'; $('huntBtn').disabled=false; sfx.win();
+        }
+      } else {
+        b.classList.remove('no'); void b.offsetWidth; b.classList.add('no'); sfx.bad();
+        toast('c says /k/ before <b>' + l + '</b> — try another letter!', 1800);
+      }
+    };
+    box.appendChild(b);
+  });
+}
+
+/* ---------- Hunt ---------- */
+function startHunt(){
+  ac(); if(AC && AC.state==='suspended') AC.resume();
+  rocks.forEach(r=>r.el.remove()); rocks=[];
+  if(setKey==='A') queue = shuffle(SET_A);
+  else if(setKey==='B') queue = shuffle(SET_B);
+  else queue = shuffle(shuffle(ALL_S).slice(0,8).concat(shuffle(ALL_H).slice(0,8)));
+  spawnIdx=0; resolved=0; score=0; hearts=3; combo=0; bestCombo=0; foundSoft=0; wrong=[]; escaped=[];
+  softTotal = queue.filter(x=>x.soft).length; breakPending=false; breakDone=false; sinceSpawn=99999;
+  $('hud').style.display='flex'; $('goal').style.display='block'; show(null); updHUD();
+  running=true; lastT=performance.now(); requestAnimationFrame(loop);
+}
+function spawn(){
+  const it = queue[spawnIdx];
+  const el = document.createElement('div'); el.className='rock'; el.innerHTML = markHTML(it.w);
+  field.appendChild(el);
+  const fw = field.clientWidth, fh = field.clientHeight, w = el.offsetWidth, h = el.offsetHeight;
+  const lanes = Math.max(3, Math.floor((fh - 90) / (h + 14)));
+  const free = []; for(let i=0;i<lanes;i++){ if(!rocks.some(r=>r.lane===i && r.x + r.w > fw - 60)) free.push(i); }
+  if(!free.length){ el.remove(); return false; }
+  const lane = free[Math.floor(Math.random()*free.length)];
+  const top = 6 + lane * ((fh - h - 70) / Math.max(1, lanes-1));
+  const sp = SPEEDS[speedKey].v * (0.85 + Math.random()*.3);
+  const r = { it, el, x: fw + 10, w, lane, sp };
+  el.style.top = top + 'px'; el.style.left = r.x + 'px';
+  el.addEventListener('pointerdown', e=>{ e.preventDefault(); tap(r); });
+  rocks.push(r); spawnIdx++; return true;
+}
+function loop(t){
+  if(!running) return;
+  const dt = Math.min(.05, (t-lastT)/1000); lastT = t; sinceSpawn += dt*1000;
+  for(let i=rocks.length-1;i>=0;i--){
+    const r = rocks[i]; r.x -= r.sp*dt; r.el.style.left = r.x + 'px';
+    if(r.x + r.w < -20){
+      rocks.splice(i,1); r.el.remove(); resolved++;
+      if(r.it.soft){ escaped.push(r.it.w); combo = 0; updHUD(); toast('A soft-c word got away: <b>' + r.it.w + '</b>', 1700); }
+    }
+  }
+  if(!breakDone && !breakPending && queue.length >= 10 && resolved >= Math.floor(queue.length/2)) breakPending = true;
+  if(!breakPending && spawnIdx < queue.length && rocks.length < SPEEDS[speedKey].max && sinceSpawn >= SPEEDS[speedKey].gap){ if(spawn()) sinceSpawn = 0; }
+  if(breakPending && rocks.length === 0){ running = false; return startBreak(); }
+  if(spawnIdx >= queue.length && rocks.length === 0){ running = false; return finish(true); }
+  requestAnimationFrame(loop);
+}
+function tap(r){
+  if(!running) return;
+  const i = rocks.indexOf(r); if(i<0) return; rocks.splice(i,1); resolved++;
+  const rect = r.el.getBoundingClientRect(), f = field.getBoundingClientRect();
+  const cx = rect.left - f.left + rect.width/2, cy = rect.top - f.top + rect.height/2;
+  if(hearWords) speak(r.it.w);
+  if(r.it.soft){
+    combo++; bestCombo = Math.max(bestCombo, combo); foundSoft++; score += 10 * Math.min(combo,5);
+    r.el.classList.add('good'); sfx.good(); burst(cx,cy); toast(reason(r.it), 2600);
+  } else {
+    combo = 0; hearts--; wrong.push(r.it.w);
+    r.el.classList.add('bad'); sfx.bad(); toast(reason(r.it), 3600);
+  }
+  updHUD(); setTimeout(()=>r.el.remove(), 850);
+  if(hearts <= 0){ running = false; setTimeout(()=>finish(false), 1200); }
+}
+
+/* ---------- Break + finish ---------- */
+function startBreak(){
+  $('breakText').textContent = BREAKS[Math.floor(Math.random()*BREAKS.length)];
+  let n = 10; $('breakTimer').textContent = n; show('breakScreen'); speak('Brain break!');
+  breakInt = setInterval(()=>{ n--; $('breakTimer').textContent = n; sfx.tick(); if(n<=0) endBreak(); }, 1000);
+}
+function endBreak(){
+  if(!breakInt) return; clearInterval(breakInt); breakInt = null;
+  breakDone = true; breakPending = false; show(null);
+  running = true; lastT = performance.now(); sinceSpawn = 99999; requestAnimationFrame(loop);
+}
+function finish(won){
+  rocks.forEach(r=>r.el.remove()); rocks=[]; $('toast').classList.remove('on');
+  $('doneTitle').textContent = won ? '🏆 Mission complete!' : '💔 Out of hearts!';
+  $('doneStats').innerHTML = '⭐ <b>' + score + '</b> points &nbsp;·&nbsp; 🎯 <b>' + foundSoft + '</b> of ' + softTotal + ' soft-c words &nbsp;·&nbsp; 🔥 best streak <b>' + bestCombo + '</b>';
+  let notes = '<b>Remember:</b> c says /s/ before <b>e, i, y</b> (race, city, cent, fancy, ice).';
+  if(wrong.length) notes += '<br>Hard c fooled you: <b>' + wrong.join(', ') + '</b> — c says /k/ before a, o, u and consonants.';
+  if(escaped.length) notes += '<br>Soft-c words that got away: <b>' + escaped.join(', ') + '</b>';
+  if(!wrong.length && !escaped.length) notes = '<b>Perfect hunt!</b> You know when c says /s/!';
+  $('doneNotes').innerHTML = notes; if(won) sfx.win(); show('doneScreen');
+}
+</script>
+</body>
+</html>

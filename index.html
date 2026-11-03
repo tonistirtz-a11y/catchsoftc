@@ -88,8 +88,14 @@
       <div class="label">Choose a word set</div>
       <div class="row" id="setRow">
         <button class="opt sel" data-set="A">📝 Worksheet words</button>
-        <button class="opt" data-set="B">➕ More words</button>
-        <button class="opt" data-set="M">🔀 Mixed</button>
+        <button class="opt" data-set="M">🌟 Big hunt</button>
+      </div>
+      <div class="label">How many words in a Big hunt?</div>
+      <div class="row" id="lenRow">
+        <button class="opt" data-n="12">12</button>
+        <button class="opt sel" data-n="20">20</button>
+        <button class="opt" data-n="30">30</button>
+        <button class="opt" data-n="40">40</button>
       </div>
       <div class="label">Choose your speed</div>
       <div class="row" id="speedRow">
@@ -139,15 +145,12 @@
 /* ---------- Words ---------- */
 const S = w => ({ w, soft: true }), H = w => ({ w, soft: false });
 const SET_A = [S('race'), H('cot'), S('city'), H('cup'), S('ice'), H('cab'), S('fancy'), H('clap'), S('cent'), H('corn')];
-const SET_B = [S('cell'), S('face'), S('mice'), S('pencil'), S('dance'), H('cat'), H('cut'), H('crab'), H('clip'), H('cube')];
-const EXTRA_S = ['rice','lace','space','price','fence','juice','mercy','spicy','bounce','place'].map(S);
-const EXTRA_H = ['cap','camp','cold','cub','cry','cost','cute','club','crisp','can'].map(H);
-const ALL_S = SET_A.concat(SET_B).concat(EXTRA_S).filter(x => x.soft);
-const ALL_H = SET_A.concat(SET_B).concat(EXTRA_H).filter(x => !x.soft);
+const SOFT = ['race','city','ice','fancy','cent','cell','face','mice','pencil','dance','rice','lace','space','price','fence','juice','mercy','spicy','bounce','place','cereal','center','cedar','nice','twice','slice','voice','police','cymbal','celery'].map(S);
+const HARD = ['cot','cup','cab','clap','corn','cat','cut','crab','clip','cube','cap','camp','cold','cub','cry','cost','club','crisp','can','cake','cow','coat','cave','cart','crow','clam','cloud','candy'].map(H);
 
 // v = pixels per second, gap = ms between words, max = most words on screen at once
-const SPEEDS = { chill: { v: 34, gap: 2600, max: 2 }, normal: { v: 52, gap: 1900, max: 3 }, zoom: { v: 80, gap: 1400, max: 4 } };
-let hearWords = false;   // off by default so the student has to read each word themselves
+const SPEEDS = { chill: { v: 48, gap: 2100, max: 3 }, normal: { v: 78, gap: 1500, max: 4 }, zoom: { v: 115, gap: 1050, max: 5 } };
+let hearWords = false, lenKey = 20, nextBreak = 10;   // off by default so the student has to read each word themselves
 const BREAKS = ['Do 10 jumping jacks! 🤸','Reach up like a rocket! 🚀','Touch your toes 5 times! 🙆','March in place for 10 steps! 🚶',
   'Take 3 big, slow breaths. 🌬️','Do 5 squats! 🏋️','Shake your hands out! 👐','Spin around once! 🌀'];
 
@@ -200,7 +203,7 @@ function updHUD(){
 /* ---------- Menu wiring ---------- */
 function pick(row, attr, cb){ $(row).addEventListener('click', e=>{ const b=e.target.closest('.opt'); if(!b) return;
   [...$(row).children].forEach(c=>c.classList.remove('sel')); b.classList.add('sel'); cb(b.dataset[attr]); }); }
-pick('setRow','set',v=>setKey=v); pick('speedRow','s',v=>speedKey=v); pick('hearRow','h',v=>hearWords=(v==='on'));
+pick('setRow','set',v=>setKey=v); pick('speedRow','s',v=>speedKey=v); pick('lenRow','n',v=>lenKey=+v); pick('hearRow','h',v=>hearWords=(v==='on'));
 $('muteBtn').onclick = ()=>{ muted=!muted; $('muteBtn').textContent = muted?'🔇':'🔊'; if(muted) try{speechSynthesis.cancel();}catch(e){} };
 $('playBtn').onclick = ()=>{ ac(); if(AC && AC.state==='suspended') AC.resume(); buildRule(); show('ruleScreen'); };
 $('skipRule').onclick = startHunt; $('huntBtn').onclick = startHunt; $('againBtn').onclick = startHunt;
@@ -236,10 +239,9 @@ function startHunt(){
   ac(); if(AC && AC.state==='suspended') AC.resume();
   rocks.forEach(r=>r.el.remove()); rocks=[];
   if(setKey==='A') queue = shuffle(SET_A);
-  else if(setKey==='B') queue = shuffle(SET_B);
-  else queue = shuffle(shuffle(ALL_S).slice(0,8).concat(shuffle(ALL_H).slice(0,8)));
+  else { const ns = Math.round(lenKey*0.45); queue = shuffle(shuffle(SOFT).slice(0,ns).concat(shuffle(HARD).slice(0,lenKey-ns))); }
   spawnIdx=0; resolved=0; score=0; hearts=3; combo=0; bestCombo=0; foundSoft=0; wrong=[]; escaped=[];
-  softTotal = queue.filter(x=>x.soft).length; breakPending=false; breakDone=false; sinceSpawn=99999;
+  softTotal = queue.filter(x=>x.soft).length; breakPending=false; breakDone=false; nextBreak=10; sinceSpawn=99999;
   $('hud').style.display='flex'; $('goal').style.display='block'; show(null); updHUD();
   running=true; lastT=performance.now(); requestAnimationFrame(loop);
 }
@@ -269,7 +271,7 @@ function loop(t){
       if(r.it.soft){ escaped.push(r.it.w); combo = 0; updHUD(); toast('A soft-c word got away: <b>' + r.it.w + '</b>', 1700); }
     }
   }
-  if(!breakDone && !breakPending && queue.length >= 10 && resolved >= Math.floor(queue.length/2)) breakPending = true;
+  if(!breakPending && queue.length >= 12 && spawnIdx < queue.length && resolved >= nextBreak) breakPending = true;
   if(!breakPending && spawnIdx < queue.length && rocks.length < SPEEDS[speedKey].max && sinceSpawn >= SPEEDS[speedKey].gap){ if(spawn()) sinceSpawn = 0; }
   if(breakPending && rocks.length === 0){ running = false; return startBreak(); }
   if(spawnIdx >= queue.length && rocks.length === 0){ running = false; return finish(true); }
@@ -300,7 +302,7 @@ function startBreak(){
 }
 function endBreak(){
   if(!breakInt) return; clearInterval(breakInt); breakInt = null;
-  breakDone = true; breakPending = false; show(null);
+  breakDone = true; breakPending = false; nextBreak += 10; show(null);
   running = true; lastT = performance.now(); sinceSpawn = 99999; requestAnimationFrame(loop);
 }
 function finish(won){

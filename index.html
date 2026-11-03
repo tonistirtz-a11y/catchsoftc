@@ -97,6 +97,12 @@
         <button class="opt" data-n="30">30</button>
         <button class="opt" data-n="40">40</button>
       </div>
+      <div class="label">Word length</div>
+      <div class="row" id="levelRow">
+        <button class="opt" data-lv="short">🌱 Short words</button>
+        <button class="opt" data-lv="long">🚀 Longer words</button>
+        <button class="opt sel" data-lv="both">🌈 Both</button>
+      </div>
       <div class="label">Choose your speed</div>
       <div class="row" id="speedRow">
         <button class="opt" data-s="chill">🐢 Chill</button>
@@ -145,12 +151,15 @@
 /* ---------- Words ---------- */
 const S = w => ({ w, soft: true }), H = w => ({ w, soft: false });
 const SET_A = [S('race'), H('cot'), S('city'), H('cup'), S('ice'), H('cab'), S('fancy'), H('clap'), S('cent'), H('corn')];
-const SOFT = ['race','city','ice','fancy','cent','cell','face','mice','pencil','dance','rice','lace','space','price','fence','juice','mercy','spicy','bounce','place','cereal','center','cedar','nice','twice','slice','voice','police','cymbal','celery'].map(S);
-const HARD = ['cot','cup','cab','clap','corn','cat','cut','crab','clip','cube','cap','camp','cold','cub','cry','cost','club','crisp','can','cake','cow','coat','cave','cart','crow','clam','cloud','candy'].map(H);
+const mk = (str, f) => str.split(' ').map(f);
+const SOFT_SHORT = mk('race face mice rice lace ice nice dice pace space place price twice slice spice trace grace brace cell cent fence dance bounce juice voice prince since glance pounce ounce', S);
+const SOFT_LONG  = mk('city fancy pencil mercy spicy icy lacy cereal center cedar police cymbal celery decide citrus cinema cider cinder civil cement century certain notice office justice recess dancer princess ceiling cellar celebrate receipt cyber', S);
+const HARD_SHORT = mk('cot cup cab clap corn cat cut crab clip cube cap camp cold cub cry cost club crisp can cake cow coat cave cart crow clam cloud crash crush cross craft cast cord cone code coal cook cool card care cane came curl cure class clean cloth crop crib cram crust', H);
+const HARD_LONG  = mk('candy carrot camel cannon canoe castle cotton copy cousin cover color comet corner costume custard curtain captain cabin cable canyon cobweb coward crayon crumb creature crowd crown cradle crater crystal clover clever climb closet clumsy cluster candle cattle cabbage carpet carton cartoon cargo cobra cowboy cuddle', H);
 
 // v = pixels per second, gap = ms between words, max = most words on screen at once
 const SPEEDS = { chill: { v: 48, gap: 2100, max: 3 }, normal: { v: 78, gap: 1500, max: 4 }, zoom: { v: 115, gap: 1050, max: 5 } };
-let hearWords = false, lenKey = 20, nextBreak = 10;   // off by default so the student has to read each word themselves
+let hearWords = false, lenKey = 20, nextBreak = 10, levelKey = 'both';   // off by default so the student has to read each word themselves
 const BREAKS = ['Do 10 jumping jacks! 🤸','Reach up like a rocket! 🚀','Touch your toes 5 times! 🙆','March in place for 10 steps! 🚶',
   'Take 3 big, slow breaths. 🌬️','Do 5 squats! 🏋️','Shake your hands out! 👐','Spin around once! 🌀'];
 
@@ -203,7 +212,7 @@ function updHUD(){
 /* ---------- Menu wiring ---------- */
 function pick(row, attr, cb){ $(row).addEventListener('click', e=>{ const b=e.target.closest('.opt'); if(!b) return;
   [...$(row).children].forEach(c=>c.classList.remove('sel')); b.classList.add('sel'); cb(b.dataset[attr]); }); }
-pick('setRow','set',v=>setKey=v); pick('speedRow','s',v=>speedKey=v); pick('lenRow','n',v=>lenKey=+v); pick('hearRow','h',v=>hearWords=(v==='on'));
+pick('setRow','set',v=>setKey=v); pick('speedRow','s',v=>speedKey=v); pick('lenRow','n',v=>lenKey=+v); pick('levelRow','lv',v=>levelKey=v); pick('hearRow','h',v=>hearWords=(v==='on'));
 $('muteBtn').onclick = ()=>{ muted=!muted; $('muteBtn').textContent = muted?'🔇':'🔊'; if(muted) try{speechSynthesis.cancel();}catch(e){} };
 $('playBtn').onclick = ()=>{ ac(); if(AC && AC.state==='suspended') AC.resume(); buildRule(); show('ruleScreen'); };
 $('skipRule').onclick = startHunt; $('huntBtn').onclick = startHunt; $('againBtn').onclick = startHunt;
@@ -239,7 +248,12 @@ function startHunt(){
   ac(); if(AC && AC.state==='suspended') AC.resume();
   rocks.forEach(r=>r.el.remove()); rocks=[];
   if(setKey==='A') queue = shuffle(SET_A);
-  else { const ns = Math.round(lenKey*0.45); queue = shuffle(shuffle(SOFT).slice(0,ns).concat(shuffle(HARD).slice(0,lenKey-ns))); }
+  else {
+    const sp = levelKey==='short' ? SOFT_SHORT : levelKey==='long' ? SOFT_LONG : SOFT_SHORT.concat(SOFT_LONG);
+    const hp = levelKey==='short' ? HARD_SHORT : levelKey==='long' ? HARD_LONG : HARD_SHORT.concat(HARD_LONG);
+    const ns = Math.round(lenKey*0.45);
+    queue = shuffle(shuffle(sp).slice(0,ns).concat(shuffle(hp).slice(0,lenKey-ns)));
+  }
   spawnIdx=0; resolved=0; score=0; hearts=3; combo=0; bestCombo=0; foundSoft=0; wrong=[]; escaped=[];
   softTotal = queue.filter(x=>x.soft).length; breakPending=false; breakDone=false; nextBreak=10; sinceSpawn=99999;
   $('hud').style.display='flex'; $('goal').style.display='block'; show(null); updHUD();
